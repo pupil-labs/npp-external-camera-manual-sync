@@ -14,7 +14,7 @@ from pupil_labs.neon_player.utilities import (
 )
 from pupil_labs.neon_recording import NeonRecording
 from PySide6.QtCore import QObject, Qt, QThread, Signal
-from PySide6.QtGui import QIcon, QImage, QPixmap
+from PySide6.QtGui import QIcon, QImage, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
@@ -121,6 +121,15 @@ class SyncDockWidget(QDockWidget):
         ext_control_layout.addWidget(self.ext_spinbox)
         main_layout.addLayout(ext_control_layout)
 
+        rotation_layout = QHBoxLayout()
+        rotation_layout.addWidget(QLabel("Rotation:"))
+        self.rot_spinbox = QSpinBox()
+        self.rot_spinbox.setRange(-180, 180)
+        self.rot_spinbox.setValue(0)
+        self.rot_spinbox.valueChanged.connect(self._on_rotation_changed)
+        rotation_layout.addWidget(self.rot_spinbox)
+        main_layout.addLayout(rotation_layout)
+
         self.ext_time_label = QLabel("Frame: 0 | PTS: 0")
         main_layout.addWidget(self.ext_time_label)
 
@@ -129,16 +138,29 @@ class SyncDockWidget(QDockWidget):
         self.btn_generate.clicked.connect(self._generate_time_file)
         main_layout.addWidget(self.btn_generate)
 
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
+    def _render_current_pixmap(self) -> None:
         if self._current_pixmap and not self._current_pixmap.isNull():
+            angle = self.rot_spinbox.value()
+            pix = self._current_pixmap
+            if angle != 0:
+                t = QTransform().rotate(angle)
+                pix = pix.transformed(t, Qt.TransformationMode.SmoothTransformation)
+
             self.ext_img_label.setPixmap(
-                self._current_pixmap.scaled(
+                pix.scaled(
                     self.ext_img_label.size(),
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._render_current_pixmap()
+
+    def _on_rotation_changed(self, val: int) -> None:
+        if self.ext_slider.isEnabled():
+            self._update_ext_frame(self.ext_slider.value())
 
     def _load_external_video(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -253,13 +275,7 @@ class SyncDockWidget(QDockWidget):
             qimg = frame_to_qimage(frame)
             if qimg:
                 self._current_pixmap = QPixmap.fromImage(qimg)
-                self.ext_img_label.setPixmap(
-                    self._current_pixmap.scaled(
-                        self.ext_img_label.size(),
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                )
+                self._render_current_pixmap()
 
             pts_str = "N/A"
             if self.ext_pts is not None and idx < len(self.ext_pts):
