@@ -341,6 +341,14 @@ class SyncDockWidget(QDockWidget):
 
         if self.ext_video_path != new_path:
             try:
+                # Close the reader to release the file handle before renaming (required on Windows)
+                if self.reader is not None:
+                    try:
+                        self.reader.close()
+                    except Exception:
+                        pass
+                    self.reader = None
+
                 self.ext_video_path.rename(new_path)
                 self.ext_video_path = new_path
             except Exception as e:
