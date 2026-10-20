@@ -385,8 +385,6 @@ class ExternalCameraManualSyncPlugin(Plugin):
 
     @action
     @action_params(
-        label="External Camera Manual Sync",
-        order=101,
         compact=True,
         icon=QIcon.fromTheme("view-refresh"),
     )
